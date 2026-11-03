@@ -1,24 +1,48 @@
 # MiniChat
 
-MiniChat là ứng dụng nhắn tin 1-1 xây dựng bằng Next.js App Router, TypeScript,
-styled-components và Supabase. Đăng nhập, danh sách bạn bè, tin nhắn, trạng thái
-online và trạng thái đang nhập đều được đồng bộ qua Supabase Realtime; quyền
-truy cập dữ liệu được kiểm soát bằng Row Level Security (RLS).
+**Ứng dụng chat 1-1 thời gian thực trên trình duyệt.**
 
-## Yêu cầu
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-149eca?logo=react)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript)](https://www.typescriptlang.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-Realtime-3ecf8e?logo=supabase)](https://supabase.com/)
 
-- Node.js 20 trở lên và npm
-- Một dự án Supabase
+**Tìm người dùng · Nhắn tin trực tiếp · Theo dõi trạng thái online**
 
-## Cài đặt và chạy local
+---
+
+## Tính năng
+
+- Đăng ký tài khoản chat bằng email, tên hiển thị và mật khẩu.
+- Tìm người dùng theo tên hoặc email để bắt đầu cuộc trò chuyện 1-1.
+- Nhận tin nhắn mới và cập nhật danh sách chat theo thời gian thực.
+- Hiển thị trạng thái đang nhập và trạng thái online của người dùng.
+- Cập nhật tên hiển thị và ảnh đại diện.
+- Bảo vệ dữ liệu bằng Row Level Security (RLS) trong Supabase.
+- Giao diện thích ứng với màn hình nhỏ và lớn.
+- Có màn hình đăng nhập nhân viên riêng, xác thực qua backend.
+
+## Sử dụng
+
+1. Mở `/register` để tạo tài khoản chat.
+2. Tìm bạn bằng tên hoặc email trong danh sách chat.
+3. Chọn người dùng và gửi tin nhắn; cuộc trò chuyện sẽ được tạo nếu chưa có.
+4. Chọn ảnh đại diện hoặc cập nhật tên hiển thị từ khu vực tài khoản.
+
+> **Lưu ý về đăng nhập:** `/login` hiện dùng username và mật khẩu nhân viên do backend xác thực. JWT của backend chỉ được lưu trong `sessionStorage` và **không** tạo phiên đăng nhập Supabase cho phần chat. Phần chat dùng Supabase Auth; để vào chat ngay sau khi đăng ký, hãy tắt yêu cầu xác nhận email trong Supabase. Khi xác nhận email được bật, ứng dụng hiện chưa có màn hình đăng nhập email/mật khẩu Supabase.
+
+## Bắt đầu
+
+Cần có Node.js 20 trở lên, npm và một dự án Supabase. Nếu muốn dùng màn hình đăng nhập nhân viên, cần thêm backend có endpoint `POST /auth/login`.
 
 ```powershell
-cd frontend
+git clone https://github.com/kiethuynh2k1yet/chatbot-frontend.git
+cd chatbot-frontend
 npm install
 Copy-Item .env.example .env.local
 ```
 
-Điền URL và anon/publishable key của dự án Supabase vào `.env.local`:
+Điền thông tin dự án Supabase vào `.env.local`:
 
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -26,16 +50,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 NEXT_PUBLIC_API_URL=http://localhost:8081/api
 ```
 
-Không sử dụng `service_role` key trong frontend. Key public được bảo vệ bằng
-các policy RLS trong migrations.
+`NEXT_PUBLIC_API_URL` là URL gốc của API backend; màn hình đăng nhập nhân viên gọi `POST {NEXT_PUBLIC_API_URL}/auth/login`. Nếu không dùng đăng nhập nhân viên, biến này không cần thiết. Không đặt Supabase `service_role` key trong ứng dụng frontend.
 
-Trang `/login` xác thực username nhân viên qua backend tại `NEXT_PUBLIC_API_URL`
-và giữ JWT trong `sessionStorage` của tab hiện tại. Cần chạy backend và cấu hình
-CORS cho origin frontend. Phiên đăng nhập backend hiện chưa liên kết với phiên
-chat Supabase.
+### Cấu hình Supabase
 
-Áp dụng các migration trong `supabase/migrations/` theo thứ tự tên. Có thể chạy
-các câu lệnh SQL trong Supabase Dashboard → SQL Editor, hoặc dùng Supabase CLI:
+Chạy các migration trong `supabase/migrations/` theo thứ tự tên, bằng Supabase Dashboard → **SQL Editor** hoặc Supabase CLI. Các migration tạo profile sau đăng ký, bảng hội thoại/tin nhắn/trạng thái nhập, RPC tạo hội thoại, policy RLS, bucket `avatars` và đăng ký bảng cho Supabase Realtime.
+
+Ví dụ dùng Supabase CLI:
 
 ```powershell
 npx supabase login
@@ -44,67 +65,75 @@ npx supabase link --project-ref YOUR_PROJECT_REF
 npx supabase db push
 ```
 
-Migration tạo profile tự động sau đăng ký, bảng hội thoại/tin nhắn/trạng thái
-nhập liệu, bucket `avatars`, policy Storage, RLS và đăng ký các bảng cần thiết
-vào publication `supabase_realtime`.
+Trong Supabase Dashboard, đặt **Site URL** thành `http://localhost:3000`. Để tài khoản vừa đăng ký vào chat ngay, tắt yêu cầu xác nhận email trong cấu hình Authentication của dự án.
 
-Trong Supabase Dashboard, đặt Site URL là `http://localhost:3000` khi phát triển
-và cấu hình URL redirect tương ứng. Nếu bật xác nhận email, người dùng sẽ thấy
-hướng dẫn xác nhận trước khi đăng nhập; tắt yêu cầu xác nhận email để chuyển
-thẳng tới `/chats` ngay sau khi đăng ký.
+### Chạy ứng dụng
 
 ```powershell
 npm run dev
 ```
 
-Mở [http://localhost:3000](http://localhost:3000). Tạo hai tài khoản riêng để
-thử tìm bạn, nhắn tin trực tiếp, typing indicator và trạng thái online. Để kiểm
-tra production:
+Mở [http://localhost:3000](http://localhost:3000). Để kiểm tra chat thời gian thực, đăng ký hai tài khoản riêng trong hai phiên trình duyệt.
 
-```powershell
-npm run lint
-npx tsc --noEmit
-npm run build
-```
+| Lệnh | Mô tả |
+| --- | --- |
+| `npm run dev` | Chạy máy chủ phát triển. |
+| `npm run lint` | Kiểm tra mã nguồn bằng ESLint. |
+| `npm run build` | Tạo bản build production. |
+| `npm run start` | Chạy bản production đã build. |
 
-## Cấu trúc chính
+## Công nghệ
+
+- [Next.js 16](https://nextjs.org/) App Router và [React 19](https://react.dev/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [Supabase](https://supabase.com/) Auth, Postgres, Storage và Realtime
+- [styled-components](https://styled-components.com/)
+- [Zod](https://zod.dev/) để kiểm tra dữ liệu biểu mẫu
+- [Lucide](https://lucide.dev/) cho biểu tượng
+
+## Cấu trúc
 
 ```text
 app/
-  login/                    Đăng nhập
-  register/                 Đăng ký
-  chats/                    Danh sách, tìm người dùng và chat 1-1
+  login/                    Đăng nhập nhân viên qua backend
+  register/                 Đăng ký tài khoản chat qua Supabase Auth
+  chats/                    Danh sách và hội thoại
 components/
-  auth/                     Form đăng nhập/đăng ký
-  chat/                     Sidebar, header, danh sách tin và composer
-  styles/                   ThemeProvider, GlobalStyle, theme, breakpoints
-  ui/                       Button, Input, Avatar, AuthCard, trạng thái
-hooks/                      Auth, conversations, messages, presence, typing
+  auth/                     Biểu mẫu đăng nhập/đăng ký
+  chat/                     Sidebar, tin nhắn và khu vực chat
+  styles/                   Theme, breakpoint và GlobalStyle
+  ui/                       Thành phần giao diện dùng chung
+hooks/                      Auth, hội thoại, tin nhắn, presence và typing
 lib/
-  supabase/client.ts        Supabase browser client (không chứa secret)
-  validators/               Zod schemas
+  api/auth.ts               Tích hợp API đăng nhập nhân viên
+  supabase/client.ts        Supabase browser client
+  validators/               Schema kiểm tra dữ liệu
 supabase/
-  migrations/               Schema, trigger, RLS, Storage và Realtime
-types/                      Domain và Supabase Database types
+  migrations/               Schema, RLS, Storage và Realtime
+types/                      Kiểu dữ liệu ứng dụng và Supabase
 ```
 
-## Hành vi và quyền truy cập
+## Quyền truy cập và giới hạn
 
-- `/` chuyển người dùng đã đăng nhập tới `/chats`, người khác tới `/login`.
-- Mỗi cặp người dùng chỉ có một hội thoại; RPC chuẩn hóa thứ tự UUID trước khi
-  tạo và được thực thi dưới RLS.
-- Chỉ thành viên hội thoại mới đọc được nội dung và gửi tin nhắn; `sender_id`
-  bắt buộc là người đang đăng nhập.
-- Người dùng chỉ sửa profile của chính mình. Các profile chỉ được đọc bởi
-  người dùng đã xác thực để hỗ trợ tìm kiếm.
-- Typing status giới hạn theo hội thoại và chỉ người dùng sở hữu được sửa.
-- Trạng thái online được heartbeat mỗi phút; trạng thái cũ hơn hai phút được
-  hiển thị như offline để tránh giữ chấm xanh sau khi mất kết nối đột ngột.
-- Ảnh đại diện tùy chọn được lưu trong bucket công khai `avatars`; chỉ chủ tài
-  khoản được tải lên hoặc thay ảnh trong thư mục UUID của mình. Ảnh tối đa 3 MB.
+- Chỉ thành viên của một hội thoại mới đọc được hội thoại và tin nhắn trong đó.
+- Người gửi tin nhắn phải là người dùng đang đăng nhập; nội dung tin nhắn dài tối đa 4.000 ký tự.
+- Mỗi cặp người dùng chỉ có một hội thoại; RPC chuẩn hóa thứ tự UUID trước khi tạo.
+- Người dùng chỉ được cập nhật hồ sơ của mình; hồ sơ đã xác thực có thể đọc để hỗ trợ tìm kiếm.
+- Chỉ thành viên hội thoại mới đọc trạng thái nhập; mỗi người dùng chỉ cập nhật trạng thái của mình.
+- Trạng thái online được cập nhật mỗi phút khi trang đang hiển thị và chuyển offline khi trang đóng hoặc phiên đăng xuất.
+- Ảnh đại diện lưu trong bucket công khai `avatars`; giới hạn 3 MB, định dạng JPEG, PNG, WebP hoặc GIF.
+- Ảnh đại diện công khai có thể xem được bởi bất kỳ ai có URL.
+- API đăng nhập nhân viên và tài khoản Supabase Auth là hai phiên độc lập; đăng nhập nhân viên hiện không cấp quyền chat.
 
-## Ghi chú triển khai
+## Đóng góp
 
-Supabase Realtime cần bật cho `messages`, `profiles` và `typing_status`; migration
-đã đăng ký ba bảng vào publication. Các thao tác dữ liệu chạy bằng Supabase
-browser client và chịu kiểm soát RLS, không cần API route dùng service key.
+Mở issue để báo lỗi hoặc đề xuất tính năng, hoặc gửi pull request. Trước khi gửi thay đổi, hãy chạy:
+
+```powershell
+npm run lint
+npm run build
+```
+
+## Giấy phép
+
+Repository hiện chưa khai báo giấy phép.
