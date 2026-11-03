@@ -1,36 +1,110 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MiniChat
 
-## Getting Started
+MiniChat là ứng dụng nhắn tin 1-1 xây dựng bằng Next.js App Router, TypeScript,
+styled-components và Supabase. Đăng nhập, danh sách bạn bè, tin nhắn, trạng thái
+online và trạng thái đang nhập đều được đồng bộ qua Supabase Realtime; quyền
+truy cập dữ liệu được kiểm soát bằng Row Level Security (RLS).
 
-First, run the development server:
+## Yêu cầu
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 20 trở lên và npm
+- Một dự án Supabase
+
+## Cài đặt và chạy local
+
+```powershell
+cd frontend
+npm install
+Copy-Item .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Điền URL và anon/publishable key của dự án Supabase vào `.env.local`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+NEXT_PUBLIC_API_URL=http://localhost:8081/api
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Không sử dụng `service_role` key trong frontend. Key public được bảo vệ bằng
+các policy RLS trong migrations.
 
-## Learn More
+Trang `/login` xác thực username nhân viên qua backend tại `NEXT_PUBLIC_API_URL`
+và giữ JWT trong `sessionStorage` của tab hiện tại. Cần chạy backend và cấu hình
+CORS cho origin frontend. Phiên đăng nhập backend hiện chưa liên kết với phiên
+chat Supabase.
 
-To learn more about Next.js, take a look at the following resources:
+Áp dụng các migration trong `supabase/migrations/` theo thứ tự tên. Có thể chạy
+các câu lệnh SQL trong Supabase Dashboard → SQL Editor, hoặc dùng Supabase CLI:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```powershell
+npx supabase login
+npx supabase init
+npx supabase link --project-ref YOUR_PROJECT_REF
+npx supabase db push
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Migration tạo profile tự động sau đăng ký, bảng hội thoại/tin nhắn/trạng thái
+nhập liệu, bucket `avatars`, policy Storage, RLS và đăng ký các bảng cần thiết
+vào publication `supabase_realtime`.
 
-## Deploy on Vercel
+Trong Supabase Dashboard, đặt Site URL là `http://localhost:3000` khi phát triển
+và cấu hình URL redirect tương ứng. Nếu bật xác nhận email, người dùng sẽ thấy
+hướng dẫn xác nhận trước khi đăng nhập; tắt yêu cầu xác nhận email để chuyển
+thẳng tới `/chats` ngay sau khi đăng ký.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```powershell
+npm run dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Mở [http://localhost:3000](http://localhost:3000). Tạo hai tài khoản riêng để
+thử tìm bạn, nhắn tin trực tiếp, typing indicator và trạng thái online. Để kiểm
+tra production:
+
+```powershell
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+## Cấu trúc chính
+
+```text
+app/
+  login/                    Đăng nhập
+  register/                 Đăng ký
+  chats/                    Danh sách, tìm người dùng và chat 1-1
+components/
+  auth/                     Form đăng nhập/đăng ký
+  chat/                     Sidebar, header, danh sách tin và composer
+  styles/                   ThemeProvider, GlobalStyle, theme, breakpoints
+  ui/                       Button, Input, Avatar, AuthCard, trạng thái
+hooks/                      Auth, conversations, messages, presence, typing
+lib/
+  supabase/client.ts        Supabase browser client (không chứa secret)
+  validators/               Zod schemas
+supabase/
+  migrations/               Schema, trigger, RLS, Storage và Realtime
+types/                      Domain và Supabase Database types
+```
+
+## Hành vi và quyền truy cập
+
+- `/` chuyển người dùng đã đăng nhập tới `/chats`, người khác tới `/login`.
+- Mỗi cặp người dùng chỉ có một hội thoại; RPC chuẩn hóa thứ tự UUID trước khi
+  tạo và được thực thi dưới RLS.
+- Chỉ thành viên hội thoại mới đọc được nội dung và gửi tin nhắn; `sender_id`
+  bắt buộc là người đang đăng nhập.
+- Người dùng chỉ sửa profile của chính mình. Các profile chỉ được đọc bởi
+  người dùng đã xác thực để hỗ trợ tìm kiếm.
+- Typing status giới hạn theo hội thoại và chỉ người dùng sở hữu được sửa.
+- Trạng thái online được heartbeat mỗi phút; trạng thái cũ hơn hai phút được
+  hiển thị như offline để tránh giữ chấm xanh sau khi mất kết nối đột ngột.
+- Ảnh đại diện tùy chọn được lưu trong bucket công khai `avatars`; chỉ chủ tài
+  khoản được tải lên hoặc thay ảnh trong thư mục UUID của mình. Ảnh tối đa 3 MB.
+
+## Ghi chú triển khai
+
+Supabase Realtime cần bật cho `messages`, `profiles` và `typing_status`; migration
+đã đăng ký ba bảng vào publication. Các thao tác dữ liệu chạy bằng Supabase
+browser client và chịu kiểm soát RLS, không cần API route dùng service key.

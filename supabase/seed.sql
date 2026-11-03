@@ -1,0 +1,2 @@
+-- User accounts are created through Supabase Auth so profile rows can be
+-- populated by the on_auth_user_created trigger.
